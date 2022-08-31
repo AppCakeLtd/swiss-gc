@@ -2004,6 +2004,23 @@ int check_game(file_handle *file, file_handle *file2, ExecutableFile *filesToPat
 }
 
 uiDrawObj_t* draw_game_info() {
+	u8 buffer[16];
+	buffer[0] = 0x8B;
+	buffer[1] = 0x10;
+
+	memcpy(buffer + 2, (u8*)&GCMDisk, 6);
+	buffer[8] = 0x00;
+	buffer[9] = 0xFF;
+	buffer[10] = 0xFF;
+	buffer[11] = 0xFF;
+	buffer[12] = 0xFF;
+	buffer[13] = 0xFF;
+	buffer[14] = 0xFF;
+	buffer[15] = 0xFF;
+
+	MCP_Send_Cmd(0, buffer, 16);
+	MCP_Send_Cmd(1, buffer, 16);
+
 	uiDrawObj_t *container = DrawEmptyBox(75,120, getVideoMode()->fbWidth-78, 400);
 
 	sprintf(txtbuffer, "%s", curFile.meta && curFile.meta->displayName ? curFile.meta->displayName : getRelativeName(curFile.name));
@@ -2173,8 +2190,14 @@ void select_device(int type)
 	
 	uiDrawObj_t *deviceSelectBox = NULL;
 	while(1) {
-		CARD_Command_Test(0, 0x200);
-		CARD_Command_Test(1, 0x200);
+		u8 buffer[4];
+		buffer[0] = 0x8B;
+		buffer[1] = 0x00;
+		buffer[2] = 0x00;
+		buffer[3] = 0x00;
+
+		MCP_Send_Cmd(0, buffer, 4);
+		MCP_Send_Cmd(1, buffer, 4);
 
 		// Device selector
 		deviceSelectBox = DrawEmptyBox(20,190, getVideoMode()->fbWidth-20, 410);
