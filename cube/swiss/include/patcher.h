@@ -138,6 +138,8 @@ extern u8 VIConfigure1080i60[];
 extern u32 VIConfigure1080i60_length;
 extern u8 VIConfigure1152i[];
 extern u32 VIConfigure1152i_length;
+extern u8 VIConfigureAutop[];
+extern u32 VIConfigureAutop_length;
 extern u8 VIConfigureHook1[];
 extern u32 VIConfigureHook1_length;
 extern u8 VIConfigureHook1GCVideo[];
@@ -179,6 +181,7 @@ enum patchIds {
 	VI_CONFIGURE1080I50,
 	VI_CONFIGURE1080I60,
 	VI_CONFIGURE1152I,
+	VI_CONFIGUREAUTOP,
 	VI_CONFIGUREHOOK1,
 	VI_CONFIGUREHOOK1_GCVIDEO,
 	VI_CONFIGUREHOOK2,
@@ -223,6 +226,7 @@ int Patch_Miscellaneous(u32 *data, u32 length, int dataType);
 void *Calc_ProperAddress(void *data, int dataType, u32 offsetFoundAt);
 void *Calc_Address(void *data, int dataType, u32 properAddress);
 int Patch_CheatsHook(u8 *data, u32 length, u32 type);
+int Patch_ExecutableFile(void **buffer, u32 *sizeToRead, const char *gameID, int type);
 void *installPatch(int patchId);
 void *installPatch2(void *patchLocation, u32 patchSize);
 void *getPatchAddr(int patchId);

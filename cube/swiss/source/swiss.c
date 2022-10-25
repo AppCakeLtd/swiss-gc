@@ -34,6 +34,7 @@
 #include "patcher.h"
 #include "dvd.h"
 #include "elf.h"
+#include "gameid.h"
 #include "gcm.h"
 #include "mp3.h"
 #include "nkit.h"
@@ -45,6 +46,7 @@
 #include "gui/IPLFontWrite.h"
 #include "devices/deviceHandler.h"
 #include "devices/filemeta.h"
+#include "xxhash/xxhash.h"
 #include "dolparameters.h"
 #include "../../reservedarea.h"
 
@@ -96,13 +98,17 @@ void ogc_video__reset()
 		}
 		if(swissSettings.sramProgressive && !getDTVStatus())
 			swissSettings.gameVMode = 0;
-	}
-	else {
-		if(swissSettings.uiVMode > 0) {
-			swissSettings.sram60Hz = (swissSettings.uiVMode >= 1 && swissSettings.uiVMode <= 2);
-			swissSettings.sramProgressive = (swissSettings.uiVMode == 2 || swissSettings.uiVMode == 4);
-		}
-		swissSettings.gameVMode = 0;
+	} else {
+		swissSettings.sram60Hz = getTVFormat() != VI_PAL;
+		swissSettings.sramProgressive = getScanMode() == VI_PROGRESSIVE;
+		
+		if(swissSettings.sramProgressive) {
+			if(swissSettings.sramVideo == SYS_VIDEO_PAL)
+				swissSettings.gameVMode = -2;
+			else
+				swissSettings.gameVMode = -1;
+		} else
+			swissSettings.gameVMode = 0;
 	}
 	
 	if(!strncmp(gameID, "GB3E51", 6)
@@ -119,6 +125,14 @@ void ogc_video__reset()
 	/* set TV mode for current game */
 	uiDrawObj_t *msgBox = NULL;
 	switch(swissSettings.gameVMode) {
+		case -2:
+			msgBox = DrawMessageBox(D_INFO, "Video Mode: PAL 576p");
+			newmode = &TVPal576ProgScale;
+			break;
+		case -1:
+			msgBox = DrawMessageBox(D_INFO, "Video Mode: NTSC 480p");
+			newmode = &TVNtsc480Prog;
+			break;
 		case 0:
 			if(swissSettings.sramVideo == SYS_VIDEO_MPAL && !getDTVStatus()) {
 				msgBox = DrawMessageBox(D_INFO, "Video Mode: PAL-M 480i");
@@ -162,16 +176,13 @@ void ogc_video__reset()
 			newmode = &TVPal576ProgScale;
 			break;
 	}
+	if((newmode != NULL) && (newmode != getVideoMode())) {
+		DrawVideoMode(newmode);
+	}
 	if(msgBox != NULL) {
 		DrawPublish(msgBox);
 		sleep(2);
 		DrawDispose(msgBox);
-	}
-}
-
-void do_videomode_swap() {
-	if((newmode != NULL) && (newmode != getVideoMode())) {
-		setVideoMode(newmode);
 	}
 }
 
@@ -296,6 +307,9 @@ void drawFiles(file_handle** directory, int num_files, uiDrawObj_t *containerPan
 		sprintf(txtbuffer, "%s", &curFile.name[0]);
 		float scale = GetTextScaleToFitInWidthWithMax(txtbuffer, ((getVideoMode()->fbWidth-150)-20), .85);
 		DrawAddChild(containerPanel, DrawStyledLabel(150, 80, txtbuffer, scale, false, defaultColor));
+		if(!strcmp(&swissSettings.autoload[0], &curFile.name[0])) {
+			DrawAddChild(containerPanel, DrawImage(TEX_STAR, ((getVideoMode()->fbWidth-30)-16), 80, 16, 16, 0, 0.0f, 1.0f, 0.0f, 1.0f, 0));
+		}
 		if(num_files > FILES_PER_PAGE) {
 			uiDrawObj_t *scrollBar = DrawVertScrollBar(getVideoMode()->fbWidth-25, fileListBase, 16, scrollBarHeight, (float)((float)curSelection/(float)(num_files-1)),scrollBarTabHeight);
 			DrawAddChild(containerPanel, scrollBar);
@@ -401,6 +415,9 @@ uiDrawObj_t* renderFileBrowser(file_handle** directory, int num_files, uiDrawObj
 				if(canLoadFileType(&curFile.name[0])) {
 					load_file();
 				}
+				else if(swissSettings.enableFileManagement) {
+					needsRefresh = manage_file() ? 1:0;
+				}
 				memcpy(&curFile, &curDir, sizeof(file_handle));
 			}
 			return filePanel;
@@ -493,6 +510,9 @@ void drawFilesCarousel(file_handle** directory, int num_files, uiDrawObj_t *cont
 		sprintf(txtbuffer, "%s", &curFile.name[0]);
 		float scale = GetTextScaleToFitInWidthWithMax(txtbuffer, (getVideoMode()->fbWidth-60), .85);
 		DrawAddChild(containerPanel, DrawStyledLabel(30, 85, txtbuffer, scale, false, defaultColor));
+		if(!strcmp(&swissSettings.autoload[0], &curFile.name[0])) {
+			DrawAddChild(containerPanel, DrawImage(TEX_STAR, ((getVideoMode()->fbWidth-30)-16), 85, 16, 16, 0, 0.0f, 1.0f, 0.0f, 1.0f, 0));
+		}
 		int left_num = curSelection - current_view_start; // Number of entries to the left
 		int right_num = (current_view_end - curSelection)-1;
 		//print_gecko("%i entries to the left, %i to the right in this view\r\n", left_num, right_num);
@@ -609,6 +629,9 @@ uiDrawObj_t* renderFileCarousel(file_handle** directory, int num_files, uiDrawOb
 				memcpy(&curFile, &(*directory)[curSelection], sizeof(file_handle));
 				if(canLoadFileType(&curFile.name[0])) {
 					load_file();
+				}
+				else if(swissSettings.enableFileManagement) {
+					needsRefresh = manage_file() ? 1:0;
 				}
 				memcpy(&curFile, &curDir, sizeof(file_handle));
 			}
@@ -767,6 +790,7 @@ void sortDols(ExecutableFile *filesToPatch, int num_files)
 
 // Allow the user to select an alternate DOL
 ExecutableFile* select_alt_dol(ExecutableFile *filesToPatch, int num_files) {
+	if(swissSettings.autoBoot) return NULL;
 	int i = 0, j = 0, max = 0, idx = 0, page = 4;
 	sortDols(filesToPatch, num_files);	// Sort DOL to the top
 	for(i = 0; i < num_files; i++) {
@@ -813,7 +837,7 @@ ExecutableFile* select_alt_dol(ExecutableFile *filesToPatch, int num_files) {
 	
 }
 
-unsigned int load_app(ExecutableFile *filesToPatch, int numToPatch)
+void load_app(ExecutableFile *fileToPatch)
 {
 	uiDrawObj_t* progBox = NULL;
 	char* gameID = (char*)0x80000000;
@@ -844,31 +868,57 @@ unsigned int load_app(ExecutableFile *filesToPatch, int numToPatch)
 	// Copy the game header to 0x80000000
 	memcpy(gameID,(char*)&GCMDisk,0x20);
 	
-	if(tgcFile.magic == TGC_MAGIC) {
-		// Read FST to top of Main Memory (round to 32 byte boundary)
-		u32 fstAddr = (topAddr-tgcFile.fstMaxLength)&~31;
-		devices[DEVICE_CUR]->seekFile(&curFile,tgcFile.fstStart,DEVICE_HANDLER_SEEK_SET);
-		if(devices[DEVICE_CUR]->readFile(&curFile,(void*)fstAddr,tgcFile.fstLength) != tgcFile.fstLength) {
-			DrawPublish(DrawMessageBox(D_FAIL, "Failed to read fst.bin"));
-			while(1);
+	if(fileToPatch != NULL) {
+		// For a DOL from a TGC, redirect the FST to the TGC FST.
+		if(fileToPatch->tgcFstOffset != 0) {
+			// Read FST to top of Main Memory (round to 32 byte boundary)
+			u32 fstAddr = (topAddr-fileToPatch->tgcFstSize)&~31;
+			devices[DEVICE_CUR]->seekFile(fileToPatch->file,fileToPatch->tgcFstOffset,DEVICE_HANDLER_SEEK_SET);
+			if(devices[DEVICE_CUR]->readFile(fileToPatch->file,(void*)fstAddr,fileToPatch->tgcFstSize) != fileToPatch->tgcFstSize) {
+				DrawPublish(DrawMessageBox(D_FAIL, "Failed to read fst.bin"));
+				while(1);
+			}
+			adjust_tgc_fst((void*)fstAddr, fileToPatch->tgcBase, fileToPatch->tgcFileStartArea, fileToPatch->tgcFakeOffset);
+			
+			// Copy bi2.bin (Disk Header Information) to just under the FST
+			u32 bi2Addr = (fstAddr-0x2000)&~31;
+			memcpy((void*)bi2Addr,(void*)&GCMDisk+0x440,0x2000);
+			
+			// Patch bi2.bin
+			Patch_GameSpecificFile((void*)bi2Addr, 0x2000, gameID, "bi2.bin");
+			
+			*(volatile u32*)0x80000020 = 0x0D15EA5E;
+			*(volatile u32*)0x80000024 = 1;
+			*(volatile u32*)0x80000034 = fstAddr;								// Arena Hi
+			*(volatile u32*)0x80000038 = fstAddr;								// FST Location in ram
+			*(volatile u32*)0x8000003C = fileToPatch->tgcFstSize;				// FST Max Length
+			*(volatile u32*)0x800000F4 = bi2Addr;								// bi2.bin location
+			*(volatile u32*)0x800030F4 = fileToPatch->tgcBase;
 		}
-		adjust_tgc_fst((void*)fstAddr, curFile.fileBase, tgcFile.userStart, tgcFile.gcmUserStart);
+		else {
+			// Read FST to top of Main Memory (round to 32 byte boundary)
+			u32 fstAddr = (topAddr-GCMDisk.MaxFSTSize)&~31;
+			devices[DEVICE_CUR]->seekFile(&curFile,GCMDisk.FSTOffset,DEVICE_HANDLER_SEEK_SET);
+			if(devices[DEVICE_CUR]->readFile(&curFile,(void*)fstAddr,GCMDisk.FSTSize) != GCMDisk.FSTSize) {
+				DrawPublish(DrawMessageBox(D_FAIL, "Failed to read fst.bin"));
+				while(1);
+			}
+			
+			// Copy bi2.bin (Disk Header Information) to just under the FST
+			u32 bi2Addr = (fstAddr-0x2000)&~31;
+			memcpy((void*)bi2Addr,(void*)&GCMDisk+0x440,0x2000);
+			
+			// Patch bi2.bin
+			Patch_GameSpecificFile((void*)bi2Addr, 0x2000, gameID, "bi2.bin");
+			
+			*(volatile u32*)0x80000020 = 0x0D15EA5E;
+			*(volatile u32*)0x80000024 = 1;
+			*(volatile u32*)0x80000034 = fstAddr;								// Arena Hi
+			*(volatile u32*)0x80000038 = fstAddr;								// FST Location in ram
+			*(volatile u32*)0x8000003C = GCMDisk.MaxFSTSize;					// FST Max Length
+			*(volatile u32*)0x800000F4 = bi2Addr;								// bi2.bin location
+		}
 		
-		// Copy bi2.bin (Disk Header Information) to just under the FST
-		u32 bi2Addr = (fstAddr-0x2000)&~31;
-		memcpy((void*)bi2Addr,(void*)&GCMDisk+0x440,0x2000);
-		
-		// Patch bi2.bin
-		Patch_GameSpecificFile((void*)bi2Addr, 0x2000, gameID, "bi2.bin");
-
-		*(volatile u32*)0x80000020 = 0x0D15EA5E;
-		*(volatile u32*)0x80000024 = 1;
-		*(volatile u32*)0x80000034 = fstAddr;								// Arena Hi
-		*(volatile u32*)0x80000038 = fstAddr;								// FST Location in ram
-		*(volatile u32*)0x8000003C = tgcFile.fstMaxLength;					// FST Max Length
-		*(volatile u32*)0x800000F4 = bi2Addr;								// bi2.bin location
-		*(volatile u32*)0x800030F4 = curFile.fileBase;
-
 		if(devices[DEVICE_PATCHES] && devices[DEVICE_PATCHES] != devices[DEVICE_CUR]) {
 			sprintf(txtbuffer, "Loading DOL\nDo not remove %s", devices[DEVICE_PATCHES]->deviceName);
 			progBox = DrawPublish(DrawProgressBar(true, 0, txtbuffer));
@@ -876,25 +926,34 @@ unsigned int load_app(ExecutableFile *filesToPatch, int numToPatch)
 		else {
 			progBox = DrawPublish(DrawProgressBar(true, 0, "Loading DOL"));
 		}
-
-		print_gecko("DOL Lives at %08X\r\n", tgcFile.dolStart);
-		sizeToRead = tgcFile.dolLength;
-		type = PATCH_DOL;
+		
+		print_gecko("DOL Lives at %08X\r\n", fileToPatch->offset);
+		sizeToRead = (fileToPatch->size + 31) & ~31;
+		type = fileToPatch->type;
 		print_gecko("DOL size %i\r\n", sizeToRead);
 		
-		// Read the entire Main DOL
-		buffer = memalign(32,sizeToRead);
+		buffer = memalign(32, sizeToRead);
 		print_gecko("DOL buffer %08X\r\n", (u32)buffer);
-		if(!buffer) {
-			return 0;
+		if(buffer == NULL) return;
+		
+		if(fileToPatch->patchFile != NULL) {
+			devices[DEVICE_PATCHES]->seekFile(fileToPatch->patchFile,0,DEVICE_HANDLER_SEEK_SET);
+			if(devices[DEVICE_PATCHES]->readFile(fileToPatch->patchFile,buffer,sizeToRead) != sizeToRead) {
+				DrawPublish(DrawMessageBox(D_FAIL, "Failed to read DOL"));
+				while(1);
+			}
 		}
-		devices[DEVICE_CUR]->seekFile(&curFile,tgcFile.dolStart,DEVICE_HANDLER_SEEK_SET);
-		if(devices[DEVICE_CUR]->readFile(&curFile,buffer,sizeToRead) != sizeToRead) {
-			DrawPublish(DrawMessageBox(D_FAIL, "Failed to read DOL"));
-			while(1);
+		else {
+			devices[DEVICE_CUR]->seekFile(fileToPatch->file,fileToPatch->offset,DEVICE_HANDLER_SEEK_SET);
+			if(devices[DEVICE_CUR]->readFile(fileToPatch->file,buffer,sizeToRead) != sizeToRead) {
+				DrawPublish(DrawMessageBox(D_FAIL, "Failed to read DOL"));
+				while(1);
+			}
+			fileToPatch->hash = XXH3_64bits(buffer, sizeToRead);
+			gameID_set(&GCMDisk, fileToPatch->hash);
 		}
 	}
-	else if(swissSettings.bs2Boot || GCMDisk.DOLOffset == 0) {
+	else {
 		if(devices[DEVICE_PATCHES] && devices[DEVICE_PATCHES] != devices[DEVICE_CUR]) {
 			sprintf(txtbuffer, "Loading BS2\nDo not remove %s", devices[DEVICE_PATCHES]->deviceName);
 			progBox = DrawPublish(DrawProgressBar(true, 0, txtbuffer));
@@ -902,7 +961,7 @@ unsigned int load_app(ExecutableFile *filesToPatch, int numToPatch)
 			if(!load_rom_ipl(devices[DEVICE_PATCHES], &buffer, &sizeToRead) &&
 				!load_rom_ipl(devices[DEVICE_CUR], &buffer, &sizeToRead) &&
 				!load_rom_ipl(&__device_sys, &buffer, &sizeToRead)) {
-				return 0;
+				return;
 			}
 		}
 		else {
@@ -910,146 +969,18 @@ unsigned int load_app(ExecutableFile *filesToPatch, int numToPatch)
 
 			if(!load_rom_ipl(devices[DEVICE_CUR], &buffer, &sizeToRead) &&
 				!load_rom_ipl(&__device_sys, &buffer, &sizeToRead)) {
-				return 0;
+				return;
 			}
 		}
 		type = PATCH_BS2;
 	}
-	else {
-		// Prompt for DOL selection if multi-dol
-		ExecutableFile* altDol = NULL;
-		if(devices[DEVICE_PATCHES] == NULL) {
-			altDol = select_alt_dol(filesToPatch, numToPatch);
-		}
-		if(altDol != NULL) {
-			print_gecko("Alt DOL selected :%08X\r\n", altDol->offset);
-			// For a DOL from a TGC, redirect the FST to the TGC FST.
-			if(altDol->tgcBase != 0) {
-				GCMDisk.FSTOffset = altDol->tgcFstOffset;
-				GCMDisk.FSTSize = altDol->tgcFstSize;
-				GCMDisk.MaxFSTSize = altDol->tgcFstSize;
-				*(vu32*)0x800030F4 = altDol->tgcBase;
-			}
-		}
-
-		// Read FST to top of Main Memory (round to 32 byte boundary)
-		u32 fstAddr = (topAddr-GCMDisk.MaxFSTSize)&~31;
-		devices[DEVICE_CUR]->seekFile(&curFile,GCMDisk.FSTOffset,DEVICE_HANDLER_SEEK_SET);
-		if(devices[DEVICE_CUR]->readFile(&curFile,(void*)fstAddr,GCMDisk.FSTSize) != GCMDisk.FSTSize) {
-			DrawPublish(DrawMessageBox(D_FAIL, "Failed to read fst.bin"));
-			while(1);
-		}
-		if(altDol != NULL && altDol->tgcBase != 0) {
-			adjust_tgc_fst((void*)fstAddr, altDol->tgcBase, altDol->tgcFileStartArea, altDol->tgcFakeOffset);
-		}
-		
-		// Copy bi2.bin (Disk Header Information) to just under the FST
-		u32 bi2Addr = (fstAddr-0x2000)&~31;
-		memcpy((void*)bi2Addr,(void*)&GCMDisk+0x440,0x2000);
-		
-		// Patch bi2.bin
-		Patch_GameSpecificFile((void*)bi2Addr, 0x2000, gameID, "bi2.bin");
-
-		*(volatile u32*)0x80000020 = 0x0D15EA5E;
-		*(volatile u32*)0x80000024 = 1;
-		*(volatile u32*)0x80000034 = fstAddr;								// Arena Hi
-		*(volatile u32*)0x80000038 = fstAddr;								// FST Location in ram
-		*(volatile u32*)0x8000003C = GCMDisk.MaxFSTSize;					// FST Max Length
-		*(volatile u32*)0x800000F4 = bi2Addr;								// bi2.bin location
-
-		if(devices[DEVICE_PATCHES] && devices[DEVICE_PATCHES] != devices[DEVICE_CUR]) {
-			sprintf(txtbuffer, "Loading DOL\nDo not remove %s", devices[DEVICE_PATCHES]->deviceName);
-			progBox = DrawPublish(DrawProgressBar(true, 0, txtbuffer));
-		}
-		else {
-			progBox = DrawPublish(DrawProgressBar(true, 0, "Loading DOL"));
-		}
-
-		if(altDol != NULL) {
-			print_gecko("DOL Lives at %08X\r\n", altDol->offset);
-			sizeToRead = altDol->size;
-			type = altDol->type;
-			print_gecko("DOL size %i\r\n", sizeToRead);
-			
-			// Read the entire Alt DOL
-			buffer = memalign(32,sizeToRead);
-			print_gecko("DOL buffer %08X\r\n", (u32)buffer);
-			if(!buffer) {
-				return 0;
-			}
-			devices[DEVICE_CUR]->seekFile(altDol->file,altDol->offset,DEVICE_HANDLER_SEEK_SET);
-			if(devices[DEVICE_CUR]->readFile(altDol->file,buffer,sizeToRead) != sizeToRead) {
-				DrawPublish(DrawMessageBox(D_FAIL, "Failed to read DOL"));
-				while(1);
-			}
-		}
-		else {
-			print_gecko("DOL Lives at %08X\r\n", GCMDisk.DOLOffset);
-			
-			// Read the Main DOL header
-			DOLHEADER dolhdr;
-			devices[DEVICE_CUR]->seekFile(&curFile,GCMDisk.DOLOffset,DEVICE_HANDLER_SEEK_SET);
-			if(devices[DEVICE_CUR]->readFile(&curFile,&dolhdr,DOLHDRLENGTH) != DOLHDRLENGTH) {
-				DrawPublish(DrawMessageBox(D_FAIL, "Failed to read DOL Header"));
-				while(1);
-			}
-			
-			// Figure out the size of the Main DOL so that we can read it all
-			sizeToRead = DOLSize(&dolhdr);
-			type = PATCH_DOL;
-			print_gecko("DOL size %i\r\n", sizeToRead);
-
-			// Read the entire Main DOL
-			buffer = memalign(32,sizeToRead);
-			print_gecko("DOL buffer %08X\r\n", (u32)buffer);
-			if(!buffer) {
-				return 0;
-			}
-			devices[DEVICE_CUR]->seekFile(&curFile,GCMDisk.DOLOffset,DEVICE_HANDLER_SEEK_SET);
-			if(devices[DEVICE_CUR]->readFile(&curFile,buffer,sizeToRead) != sizeToRead) {
-				DrawPublish(DrawMessageBox(D_FAIL, "Failed to read DOL"));
-				while(1);
-			}
-		}
-	}
-
+	
 	setTopAddr((u32)VAR_PATCHES_BASE);
-
-	// Patch hypervisor
-	if(devices[DEVICE_CUR]->features & FEAT_HYPERVISOR) {
-		Patch_Hypervisor(buffer, sizeToRead, type);
-		Patch_GameSpecificHypervisor(buffer, sizeToRead, gameID, type);
+	
+	if(fileToPatch == NULL || fileToPatch->patchFile == NULL) {
+		Patch_ExecutableFile(&buffer, &sizeToRead, gameID, type);
 	}
 	
-	// Patch specific game hacks
-	Patch_GameSpecific(buffer, sizeToRead, gameID, type);
-	
-	// Patch CARD, PAD
-	Patch_Miscellaneous(buffer, sizeToRead, type);
-	
-	// Force Video Mode
-	if(swissSettings.disableVideoPatches < 2) {
-		if(swissSettings.disableVideoPatches < 1) {
-			Patch_GameSpecificVideo(buffer, sizeToRead, gameID, type);
-		}
-		Patch_VideoMode(buffer, sizeToRead, type);
-	}
-	// Force Widescreen
-	if(swissSettings.forceWidescreen) {
-		Patch_Widescreen(buffer, sizeToRead, type);
-	}
-	// Force Anisotropy
-	if(swissSettings.forceAnisotropy) {
-		Patch_TexFilt(buffer, sizeToRead, type);
-	}
-	// Force Text Encoding
-	Patch_FontEncode(buffer, sizeToRead);
-	
-	// Cheats
-	if(swissSettings.wiirdDebug || getEnabledCheatsSize() > 0) {
-		Patch_CheatsHook(buffer, sizeToRead, type);
-	}
-
 	DCFlushRange(buffer, sizeToRead);
 	ICInvalidateRange(buffer, sizeToRead);
 	
@@ -1060,7 +991,7 @@ unsigned int load_app(ExecutableFile *filesToPatch, int numToPatch)
 		DrawPublish(msgBox);
 		wait_press_A();
 		DrawDispose(msgBox);
-		return 0;
+		return;
 	}
 	
 	// Don't spin down the drive when running something from it...
@@ -1075,8 +1006,11 @@ unsigned int load_app(ExecutableFile *filesToPatch, int numToPatch)
 	DrawDispose(progBox);
 	DrawShutdown();
 	
-	do_videomode_swap();
-	VIDEO_SetPostRetraceCallback (NULL);
+	VIDEO_SetPostRetraceCallback(NULL);
+	VIDEO_SetBlack(true);
+	VIDEO_Flush();
+	VIDEO_WaitVSync();
+	
 	DCFlushRange((void*)0x80000000, 0x3100);
 	ICInvalidateRange((void*)0x80000000, 0x3100);
 	
@@ -1102,7 +1036,6 @@ unsigned int load_app(ExecutableFile *filesToPatch, int numToPatch)
 	else if(type == PATCH_ELF) {
 		ELFtoARAM(buffer, 0, NULL);
 	}
-	return 0;
 }
 
 void boot_dol()
@@ -1137,6 +1070,7 @@ void boot_dol()
 		}
   		ptr+=size;
 	}
+	gameID_set(NULL, XXH3_64bits(dol_buffer, curFile.size));
 	DrawDispose(progBar);
 	
 	if(devices[DEVICE_CONFIG] != NULL) {
@@ -1368,7 +1302,7 @@ bool manage_file() {
 		if(devices[DEVICE_CUR] != devices[DEVICE_DEST]) {
 			devices[DEVICE_DEST]->deinit( devices[DEVICE_DEST]->initial );	
 			deviceHandler_setStatEnabled(0);
-			if(!devices[DEVICE_DEST]->init( devices[DEVICE_DEST]->initial )) {
+			if(devices[DEVICE_DEST]->init( devices[DEVICE_DEST]->initial )) {
 				sprintf(txtbuffer, "Failed to init destination device! (%u)\nPress A to continue.",ret);
 				uiDrawObj_t *msgBox = DrawMessageBox(D_FAIL,txtbuffer);
 				DrawPublish(msgBox);
@@ -1788,31 +1722,45 @@ void load_game() {
 	}
 	
 	DrawDispose(msgBox);
+	// Find the config for this game, or default if we don't know about it
+	ConfigEntry *config = calloc(1, sizeof(ConfigEntry));
+	memcpy(config->game_id, &GCMDisk.ConsoleID, 4);
+	memcpy(config->game_name, GCMDisk.GameName, 64);
+	config->cleanBoot = !valid_gcm_boot(&GCMDisk);
+	config_find(config);
+	
 	// Show game info or return to the menu
-	int bootMode = info_game();
-	if(!bootMode) return;
-	
-	if(tgcFile.magic == TGC_MAGIC) {
-		bootMode = 1;
-	}
-	else if(!valid_gcm_boot(&GCMDisk)) {
-		bootMode = 2;
+	if(!info_game(config)) {
+		free(config);
+		return;
 	}
 	
-	if(bootMode == 2) {
+	if(devices[DEVICE_CONFIG] != NULL) {
+		// Update the recent list.
+		if(update_recent()) {
+			uiDrawObj_t *msgBox = DrawPublish(DrawProgressBar(true, 0, "Saving recent list ..."));
+			config_update_recent(true);
+			DrawDispose(msgBox);
+		}
+	}
+	
+	// Load config for this game into our current settings
+	config_load_current(config);
+	
+	if(config->cleanBoot) {
+		gameID_set(&GCMDisk, get_gcm_boot_hash(&GCMDisk));
+		
 		if(devices[DEVICE_CUR]->location != LOC_DVD_CONNECTOR) {
 			msgBox = DrawPublish(DrawMessageBox(D_WARN, "Device does not support clean boot."));
 			sleep(2);
 			DrawDispose(msgBox);
-			config_unload_current();
-			return;
+			goto fail;
 		}
 		if(!devices[DEVICE_CUR]->setupFile(&curFile, disc2File, NULL, -2)) {
 			msgBox = DrawPublish(DrawMessageBox(D_FAIL, "Failed to setup the file (too fragmented?)"));
 			wait_press_A();
 			DrawDispose(msgBox);
-			config_unload_current();
-			return;
+			goto fail;
 		}
 		if(devices[DEVICE_CUR] != &__device_dvd) {
 			devices[DEVICE_CUR]->deinit(&curFile);
@@ -1836,7 +1784,6 @@ void load_game() {
 			DrawDispose(msgBox);
 		}
 	}
-	
 	if(swissSettings.wiirdDebug || getEnabledCheatsSize() > 0) {
 		setTopAddr(WIIRD_ENGINE);
 	}
@@ -1851,8 +1798,37 @@ void load_game() {
 	// Report to the user the patch status of this GCM/ISO file
 	numToPatch = check_game(&curFile, disc2File, filesToPatch);
 	
-	*(vu8*)VAR_CURRENT_DISC = FRAGS_DISC_1;
-	*(vu8*)VAR_SECOND_DISC = disc2File ? 1:0;
+	// Prompt for DOL selection if multi-dol
+	ExecutableFile *fileToPatch = NULL;
+	if(devices[DEVICE_PATCHES] == NULL) {
+		fileToPatch = select_alt_dol(filesToPatch, numToPatch);
+	}
+	if(fileToPatch != NULL) {
+		print_gecko("Alt DOL selected: %s\r\n", fileToPatch->name);
+		gameID_set(&GCMDisk, fileToPatch->hash);
+	}
+	else if(tgcFile.magic == TGC_MAGIC) {
+		for(int i = 0; i < numToPatch; i++) {
+			if(filesToPatch[i].file == &curFile && filesToPatch[i].offset == tgcFile.dolStart) {
+				fileToPatch = &filesToPatch[i];
+				gameID_set(&GCMDisk, filesToPatch[i].hash);
+				break;
+			}
+		}
+	}
+	else {
+		for(int i = 0; i < numToPatch; i++) {
+			if(filesToPatch[i].file == &curFile && filesToPatch[i].offset == GCMDisk.DOLOffset) {
+				if(!swissSettings.bs2Boot)
+					fileToPatch = &filesToPatch[i];
+				gameID_set(&GCMDisk, filesToPatch[i].hash);
+				break;
+			}
+		}
+	}
+	
+	*(vu8*)VAR_CURRENT_DISC = fileToPatch && fileToPatch->file == disc2File;
+	*(vu8*)VAR_SECOND_DISC = !!disc2File;
 	*(vu8*)VAR_DRIVE_PATCHED = 0;
 	*(vu8*)VAR_EMU_READ_SPEED = swissSettings.emulateReadSpeed;
 	*(vu32**)VAR_EXI_REGS = NULL;
@@ -1870,13 +1846,12 @@ void load_game() {
 		msgBox = DrawPublish(DrawMessageBox(D_FAIL, "Failed to setup the file (too fragmented?)"));
 		wait_press_A();
 		DrawDispose(msgBox);
-		goto fail;
+		goto fail_patched;
 	}
 
-	load_app(filesToPatch, numToPatch);
-fail:
-	config_unload_current();
+	load_app(fileToPatch);
 
+fail_patched:
 	if(devices[DEVICE_PATCHES] != NULL) {
 		for(int i = 0; i < numToPatch; i++) {
 			devices[DEVICE_PATCHES]->closeFile(filesToPatch[i].patchFile);
@@ -1888,6 +1863,10 @@ fail:
 		devices[DEVICE_PATCHES] = NULL;
 	}
 	free(filesToPatch);
+fail:
+	gameID_unset();
+	config_unload_current();
+	free(config);
 }
 
 /* Execute/Load/Parse the currently selected file */
@@ -2091,42 +2070,38 @@ uiDrawObj_t* draw_game_info() {
 }
 
 /* Show info about the game - and also load the config for it */
-int info_game()
+int info_game(ConfigEntry *config)
 {
-	int ret = -1;
-	ConfigEntry *config = NULL;
-	// Find the config for this game, or default if we don't know about it
-	config = calloc(1, sizeof(ConfigEntry));
-	memcpy(config->game_id, &GCMDisk.ConsoleID, 4);
-	strncpy(&config->game_name[0], &GCMDisk.GameName[0], 64);
-	config_find(config);	// populate
+	if(swissSettings.autoBoot) {
+		if(PAD_ButtonsHeld(0) & PAD_BUTTON_B) {
+			swissSettings.autoBoot = 0;
+		} else {
+			return swissSettings.autoBoot;
+		}
+	}
+	int ret = 0, num_cheats = -1;
 	uiDrawObj_t *infoPanel = DrawPublish(draw_game_info());
-	int num_cheats = -1;
 	while(1) {
 		while(PAD_ButtonsHeld(0) & (PAD_BUTTON_X | PAD_BUTTON_B | PAD_BUTTON_A | PAD_BUTTON_Y | PAD_TRIGGER_Z | PAD_TRIGGER_R)){ VIDEO_WaitVSync (); }
 		while(!(PAD_ButtonsHeld(0) & (PAD_BUTTON_X | PAD_BUTTON_B | PAD_BUTTON_A | PAD_BUTTON_Y | PAD_TRIGGER_Z | PAD_TRIGGER_R))){ VIDEO_WaitVSync (); }
 		u32 buttons = PAD_ButtonsHeld(0);
-		if(buttons & (PAD_BUTTON_B|PAD_BUTTON_A)){
-			ret = (buttons & PAD_BUTTON_A) ? (buttons & PAD_TRIGGER_L) ? 2:1:0;
-			// WODE can't return from here.
-			if(devices[DEVICE_CUR] == &__device_wode && !ret) {
-				continue;
+		if(buttons & PAD_BUTTON_A) {
+			if(buttons & PAD_TRIGGER_L) {
+				config->cleanBoot = 1;
 			}
-			if(ret && devices[DEVICE_CONFIG] != NULL) {
-				// Update the recent list.
-				if(update_recent()) {
-					uiDrawObj_t *msgBox = DrawPublish(DrawProgressBar(true, 0, "Saving recent list ..."));
-					config_update_recent(true);
-					DrawDispose(msgBox);
-				}
-			}
+			ret = 1;
+			break;
+		}
+		// WODE can't return from here.
+		if((buttons & PAD_BUTTON_B) && devices[DEVICE_CUR] != &__device_wode) {
+			ret = 0;
 			break;
 		}
 		if((buttons & PAD_TRIGGER_R) && is_verifiable_disc(&GCMDisk)) {
 			verify_game();
 		}
 		if(buttons & PAD_BUTTON_X) {
-			show_settings(valid_gcm_boot(&GCMDisk) ? &curFile : NULL, config);
+			show_settings(PAGE_GAME, 0, config);
 		}
 		if((buttons & PAD_TRIGGER_Z) && devices[DEVICE_CONFIG] != NULL) {
 			// Toggle autoload
@@ -2157,10 +2132,6 @@ int info_game()
 	}
 	while(PAD_ButtonsHeld(0) & PAD_BUTTON_A){ VIDEO_WaitVSync (); }
 	DrawDispose(infoPanel);
-	// Load config for this game into our current settings
-	if(ret) 
-		config_load_current(config);
-	free(config);
 	return ret;
 }
 
@@ -2339,9 +2310,16 @@ void menu_loop()
 			memcpy(&curFile, devices[DEVICE_CUR]->initial, sizeof(file_handle));
 			uiDrawObj_t *msgBox = DrawPublish(DrawProgressBar(true, 0, "Setting up device"));
 			// If the user selected a device, make sure it's ready before we browse the filesystem
-			if(!devices[DEVICE_CUR]->init( devices[DEVICE_CUR]->initial )) {
+			s32 ret = devices[DEVICE_CUR]->init( devices[DEVICE_CUR]->initial );
+			if(ret) {
 				needsDeviceChange = 1;
-				deviceHandler_setDeviceAvailable(devices[DEVICE_CUR], false);
+				if(ret == ENODEV) {	// for completely removed devices vs something like the disc drive without a disc.
+					deviceHandler_setDeviceAvailable(devices[DEVICE_CUR], false);
+				}
+				DrawDispose(msgBox);
+				char* statusMsg = devices[DEVICE_CUR]->status(devices[DEVICE_CUR]->initial);
+				msgBox = DrawPublish(DrawMessageBox(D_FAIL, statusMsg ? statusMsg : strerror(ret)));
+				sleep(2);
 				DrawDispose(msgBox);
 				return;
 			}
@@ -2393,7 +2371,7 @@ void menu_loop()
 						needsDeviceChange = 1;  //Change from SD->DVD or vice versa
 						break;
 					case MENU_SETTINGS:
-						show_settings(NULL, NULL);
+						show_settings(PAGE_GLOBAL, 0, NULL);
 						break;
 					case MENU_INFO:
 						show_info();

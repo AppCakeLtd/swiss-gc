@@ -60,42 +60,14 @@ void Initialise (void)
 	
 	__SYS_ReadROM(IPLInfo,256,0);	// Read IPL tag
 
-	// By default, let libOGC figure out the video mode
-	GXRModeObj *vmode = VIDEO_GetPreferredMode(NULL); //Last mode used
-	if(is_gamecube()) {	// Gamecube, determine based on IPL
-		int retPAD = 0, retCnt = 10000;
-		while(retPAD <= 0 && retCnt >= 0) { retPAD = PAD_ScanPads(); usleep(100); retCnt--; }
-		// L Trigger held down ignores the fact that there's a component cable plugged in.
-		if(VIDEO_HaveComponentCable() && !(PAD_ButtonsDown(0) & PAD_TRIGGER_L)) {
-			if(strstr(IPLInfo,"MPAL")!=NULL) {
-				swissSettings.sramVideo = SYS_VIDEO_MPAL;
-				vmode = &TVNtsc480Prog;
-			}
-			else if((strstr(IPLInfo,"PAL")!=NULL)) {
-				swissSettings.sramVideo = SYS_VIDEO_PAL;
-				vmode = &TVPal576ProgScale;
-			}
-			else {
-				swissSettings.sramVideo = SYS_VIDEO_NTSC;
-				vmode = &TVNtsc480Prog;
-			}
-		}
-		else {
-			//try to use the IPL region
-			if(strstr(IPLInfo,"MPAL")!=NULL) {
-				swissSettings.sramVideo = SYS_VIDEO_MPAL;
-				vmode = &TVMpal480IntDf;
-			}
-			else if(strstr(IPLInfo,"PAL")!=NULL) {
-				swissSettings.sramVideo = SYS_VIDEO_PAL;
-				vmode = &TVPal576IntDfScale;
-			}
-			else {
-				swissSettings.sramVideo = SYS_VIDEO_NTSC;
-				vmode = &TVNtsc480IntDf;
-			}
-		}
-	}
+	if(!strncmp(&IPLInfo[0x55], "NTSC", 4))
+		swissSettings.sramVideo = SYS_VIDEO_NTSC;
+	else if(!strncmp(&IPLInfo[0x55], "PAL ", 4))
+		swissSettings.sramVideo = SYS_VIDEO_PAL;
+	else if(!strncmp(&IPLInfo[0x55], "MPAL", 4))
+		swissSettings.sramVideo = SYS_VIDEO_MPAL;
+
+	GXRModeObj *vmode = getVideoModeFromSwissSetting(swissSettings.uiVMode);
 	setVideoMode(vmode);
 
 	init_font();
@@ -139,7 +111,7 @@ void config_migration(char* text, int state, int percent) {
 /****************************************************************************
 * Main
 ****************************************************************************/
-int main () 
+int main(int argc, char *argv[])
 {
 	// Setup defaults (if no config is found)
 	memset(&swissSettings, 0 , sizeof(SwissSettings));
@@ -176,8 +148,6 @@ int main ()
 	devices[DEVICE_CONFIG] = NULL;
 	devices[DEVICE_PATCHES] = NULL;
 	
-	Initialise();
-	
 	// Sane defaults
 	refreshSRAM(&swissSettings);
 	swissSettings.debugUSB = 0;
@@ -186,6 +156,7 @@ int main ()
 	swissSettings.uiVMode = 0; 		// Auto UI mode
 	swissSettings.aveCompat = 1;
 	swissSettings.enableFileManagement = 0;
+	Initialise();
 
 	needsDeviceChange = 1;
 	needsRefresh = 1;
@@ -214,7 +185,7 @@ int main ()
 	}
 	if(devices[DEVICE_CUR] != NULL) {
 		print_gecko("Detected %s\r\n", devices[DEVICE_CUR]->deviceName);
-		if(devices[DEVICE_CUR]->init(devices[DEVICE_CUR]->initial)) {
+		if(!devices[DEVICE_CUR]->init(devices[DEVICE_CUR]->initial)) {
 			if(devices[DEVICE_CUR]->features & FEAT_AUTOLOAD_DOL) {
 				load_auto_dol();
 			}
@@ -244,6 +215,7 @@ int main ()
 	
 	// Read Swiss settings
 	config_init(&config_migration);
+	config_parse_args(argc, argv);
 	
 	// Swiss video mode force
 	GXRModeObj *forcedMode = getVideoModeFromSwissSetting(swissSettings.uiVMode);
@@ -273,7 +245,7 @@ int main ()
 			if(strverscmp(swissSettings.gcloaderTopVersion, gcloaderVersionStr) < 0) {
 				strlcpy(swissSettings.gcloaderTopVersion, gcloaderVersionStr, sizeof(swissSettings.gcloaderTopVersion));
 			}
-			if(strverscmp(swissSettings.gcloaderTopVersion, "1.1.2") < 0) {
+			if(strverscmp(swissSettings.gcloaderTopVersion, "2.0.0") < 0 || !strcmp("2.0.0.BETA", gcloaderVersionStr)) {
 				uiDrawObj_t *msgBox = DrawPublish(DrawMessageBox(D_INFO, "A firmware update is available.\ngc-loader.com/firmware-updates"));
 				wait_press_A();
 				DrawDispose(msgBox);

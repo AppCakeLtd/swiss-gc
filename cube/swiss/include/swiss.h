@@ -79,13 +79,14 @@ extern bool select_dest_dir(file_handle* directory, file_handle* selection);
 
 typedef struct {
 	int debugUSB; // Debug prints over USBGecko
-	int hasDVDDrive;	// 0 if none, 1 if something, 2 if present and init'd from cold boot
+	int hasDVDDrive;	// 0 if none, 1 if something
 	int exiSpeed;
 	int uiVMode;	// What mode to force Swiss into
 	int gameVMode;	// What mode to force a Game into
 	int forceHScale;
 	short forceVOffset;
 	int forceVFilter;
+	int forceVJitter;
 	int disableDithering;
 	int forceAnisotropy;
 	int forceWidescreen;
@@ -120,6 +121,7 @@ typedef struct {
 	char fspHostIp[32];
 	u16 fspPort;
 	char fspPassword[32];
+	int autoBoot;
 	int autoCheats;
 	int igrType;
 	int initNetworkAtStart;
