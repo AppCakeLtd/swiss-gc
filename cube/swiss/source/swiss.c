@@ -2211,9 +2211,6 @@ void select_device(int type)
 	
 	uiDrawObj_t *deviceSelectBox = NULL;
 	while(1) {
-		CARD_Command_Test(0, 0x200);
-		CARD_Command_Test(1, 0x200);
-
 		// Device selector
 		deviceSelectBox = DrawEmptyBox(20,190, getVideoMode()->fbWidth-20, 410);
 		uiDrawObj_t *selectLabel = DrawStyledLabel(640/2, 195
