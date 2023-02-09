@@ -1,5 +1,5 @@
 /* 
- * Copyright (c) 2022, Extrems <extrems@extremscorner.org>
+ * Copyright (c) 2022-2023, Extrems <extrems@extremscorner.org>
  * 
  * This file is part of Swiss.
  * 
@@ -32,11 +32,12 @@ static void callback(s32 chan, u32 type)
 
 static s32 onreset(s32 final)
 {
-	static bool sent = false;
+	static s32 chan = SI_CHAN0;
 
 	if (!final) {
-		if (!sent) {
-			sent = SI_Transfer(SI_CHAN0, &command, sizeof(command), NULL, 0, callback, 0);
+		if (chan < SI_MAX_CHAN) {
+			if (SI_Transfer(chan, &command, sizeof(command), NULL, 0, callback, 0))
+				chan++;
 			return FALSE;
 		} else if (SI_Busy())
 			return FALSE;
@@ -52,10 +53,12 @@ static sys_resetinfo resetinfo = {
 __attribute((constructor))
 static void gameID_init(void)
 {
-	while (SI_Busy());
+	s32 chan = SI_CHAN0;
 
-	if (SI_Transfer(SI_CHAN0, &command, sizeof(command), NULL, 0, NULL, 0))
-		SI_Sync();
+	while (chan < SI_MAX_CHAN)
+		if (SI_Transfer(chan, &command, sizeof(command), NULL, 0, callback, 0))
+			chan++;
+	while (SI_Busy());
 
 	SYS_RegisterResetFunc(&resetinfo);
 }
@@ -70,10 +73,16 @@ void gameID_early_set(const DiskHeader *header)
 {
 	for (s32 chan = 0; chan < 2; chan++) {
 		u32 id;
-		if (MCP_ProbeEx(chan) < 0) continue;
-		if (MCP_GetDeviceID(chan, &id) < 0) continue;
-		if (MCP_SetDiskID(chan, (dvddiskid *)header) < 0) continue;
-		if (MCP_SetDiskInfo(chan, header->GameName) < 0) continue;
+		s32 ret;
+
+		while ((ret = MCP_ProbeEx(chan)) == MCP_RESULT_BUSY);
+		if (ret < 0) continue;
+		while ((ret = MCP_GetDeviceID(chan, &id)) == MCP_RESULT_BUSY);
+		if (ret < 0) continue;
+		while ((ret = MCP_SetDiskID(chan, (dvddiskid *)header)) == MCP_RESULT_BUSY);
+		if (ret < 0) continue;
+		while ((ret = MCP_SetDiskInfo(chan, header->GameName)) == MCP_RESULT_BUSY);
+		if (ret < 0) continue;
 	}
 }
 

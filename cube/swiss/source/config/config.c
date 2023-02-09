@@ -153,6 +153,7 @@ int config_update_global(bool checkConfigDevice) {
 	fprintf(fp, "Disable Video Patches=%s\r\n", disableVideoPatchesStr[swissSettings.disableVideoPatches]);
 	fprintf(fp, "Force Video Active=%s\r\n", swissSettings.forceVideoActive ? "Yes":"No");
 	fprintf(fp, "Force DTV Status=%s\r\n", swissSettings.forceDTVStatus ? "Yes":"No");
+	fprintf(fp, "Pause for resolution change=%s\r\n", swissSettings.pauseAVOutput ? "Yes":"No");
 	fprintf(fp, "SMBUserName=%s\r\n", swissSettings.smbUser);
 	fprintf(fp, "SMBPassword=%s\r\n", swissSettings.smbPassword);
 	fprintf(fp, "SMBShareName=%s\r\n", swissSettings.smbShare);
@@ -186,10 +187,12 @@ int config_update_global(bool checkConfigDevice) {
 	fprintf(fp, "Disable Alpha Dithering=%s\r\n", swissSettings.disableDithering ? "Yes":"No");
 	fprintf(fp, "Force Anisotropic Filter=%s\r\n", swissSettings.forceAnisotropy ? "Yes":"No");
 	fprintf(fp, "Force Widescreen=%s\r\n", forceWidescreenStr[swissSettings.forceWidescreen]);
+	fprintf(fp, "Force Polling Rate=%s\r\n", forcePollRateStr[swissSettings.forcePollRate]);
 	fprintf(fp, "Invert Camera Stick=%s\r\n", invertCStickStr[swissSettings.invertCStick]);
 	fprintf(fp, "Digital Trigger Level=%hhu\r\n", swissSettings.triggerLevel);
 	fprintf(fp, "Emulate Read Speed=%s\r\n", emulateReadSpeedStr[swissSettings.emulateReadSpeed]);
 	fprintf(fp, "Emulate Memory Card=%s\r\n", swissSettings.emulateMemoryCard ? "Yes":"No");
+	fprintf(fp, "Prefer Clean Boot=%s\r\n", swissSettings.preferCleanBoot ? "Yes":"No");
 	fprintf(fp, "#!!Swiss Settings End!!\r\n\r\n");
 	fclose(fp);
 
@@ -255,9 +258,11 @@ int config_update_game(ConfigEntry* entry, bool checkConfigDevice) {
 	fprintf(fp, "Disable Alpha Dithering=%s\r\n", entry->disableDithering ? "Yes":"No");
 	fprintf(fp, "Force Anisotropic Filter=%s\r\n", entry->forceAnisotropy ? "Yes":"No");
 	fprintf(fp, "Force Widescreen=%s\r\n", forceWidescreenStr[entry->forceWidescreen]);
+	fprintf(fp, "Force Polling Rate=%s\r\n", forcePollRateStr[entry->forcePollRate]);
 	fprintf(fp, "Invert Camera Stick=%s\r\n", invertCStickStr[entry->invertCStick]);
 	fprintf(fp, "Digital Trigger Level=%hhu\r\n", entry->triggerLevel);
 	fprintf(fp, "Emulate Read Speed=%s\r\n", emulateReadSpeedStr[entry->emulateReadSpeed]);
+	fprintf(fp, "Prefer Clean Boot=%s\r\n", entry->preferCleanBoot ? "Yes":"No");
 	fclose(fp);
 
 	ensure_path(DEVICE_CONFIG, SWISS_BASE_DIR, NULL);
@@ -287,9 +292,11 @@ void config_defaults(ConfigEntry *entry) {
 	entry->disableDithering = swissSettings.disableDithering;
 	entry->forceAnisotropy = swissSettings.forceAnisotropy;
 	entry->forceWidescreen = swissSettings.forceWidescreen;
+	entry->forcePollRate = swissSettings.forcePollRate;
 	entry->invertCStick = swissSettings.invertCStick;
 	entry->triggerLevel = swissSettings.triggerLevel;
 	entry->emulateReadSpeed = swissSettings.emulateReadSpeed;
+	entry->preferCleanBoot = swissSettings.preferCleanBoot;
 
 	for(int i = 0; i < sizeof(emulateReadSpeedEntries) / sizeof(*emulateReadSpeedEntries); i++) {
 		if(!strncmp(entry->game_id, emulateReadSpeedEntries[i], 4)) {
@@ -368,15 +375,6 @@ void config_parse_legacy(char *configData, void (*progress_indicator)(char*, int
 					int *ptr = !defaultPassed ? &swissSettings.forceVFilter : &configEntries[configEntriesCount].forceVFilter;
 					for(int i = 0; i < 4; i++) {
 						if(!strcmp(forceVFilterStr[i], value)) {
-							*ptr = i;
-							break;
-						}
-					}
-				}
-				else if(!strcmp("Force Field Rendering", name)) {
-					int *ptr = !defaultPassed ? &swissSettings.forceVJitter : &configEntries[configEntriesCount].forceVJitter;
-					for(int i = 0; i < 3; i++) {
-						if(!strcmp(forceVJitterStr[i], value)) {
 							*ptr = i;
 							break;
 						}
@@ -477,9 +475,6 @@ void config_parse_legacy(char *configData, void (*progress_indicator)(char*, int
 				}
 				else if(!strcmp("SMBHostIP", name)) {
 					strlcpy(swissSettings.smbServerIp, value, sizeof(swissSettings.smbServerIp));
-				}
-				else if(!strcmp("AutoBoot", name)) {
-					swissSettings.autoBoot = !strcmp("Yes", value);
 				}
 				else if(!strcmp("AutoCheats", name)) {
 					swissSettings.autoCheats = !strcmp("Yes", value);
@@ -656,6 +651,14 @@ void config_parse_global(char *configData) {
 						}
 					}
 				}
+				else if(!strcmp("Force Polling Rate", name)) {
+					for(int i = 0; i < 13; i++) {
+						if(!strcmp(forcePollRateStr[i], value)) {
+							swissSettings.forcePollRate = i;
+							break;
+						}
+					}
+				}
 				else if(!strcmp("Invert Camera Stick", name)) {
 					for(int i = 0; i < 4; i++) {
 						if(!strcmp(invertCStickStr[i], value)) {
@@ -677,6 +680,9 @@ void config_parse_global(char *configData) {
 				}
 				else if(!strcmp("Emulate Memory Card", name)) {
 					swissSettings.emulateMemoryCard = !strcmp("Yes", value);
+				}
+				else if(!strcmp("Prefer Clean Boot", name)) {
+					swissSettings.preferCleanBoot = !strcmp("Yes", value);
 				}
 				
 				// Swiss settings
@@ -719,6 +725,9 @@ void config_parse_global(char *configData) {
 				}
 				else if(!strcmp("Force DTV Status", name)) {
 					swissSettings.forceDTVStatus = !strcmp("Yes", value);
+				}
+				else if(!strcmp("Pause for resolution change", name)) {
+					swissSettings.pauseAVOutput = !strcmp("Yes", value);
 				}
 				else if(!strcmp("SMBUserName", name)) {
 					strlcpy(swissSettings.smbUser, value, sizeof(swissSettings.smbUser));
@@ -936,6 +945,14 @@ void config_parse_game(char *configData, ConfigEntry *entry) {
 						}
 					}
 				}
+				else if(!strcmp("Force Polling Rate", name)) {
+					for(int i = 0; i < 13; i++) {
+						if(!strcmp(forcePollRateStr[i], value)) {
+							entry->forcePollRate = i;
+							break;
+						}
+					}
+				}
 				else if(!strcmp("Invert Camera Stick", name)) {
 					for(int i = 0; i < 4; i++) {
 						if(!strcmp(invertCStickStr[i], value)) {
@@ -954,6 +971,9 @@ void config_parse_game(char *configData, ConfigEntry *entry) {
 							break;
 						}
 					}
+				}
+				else if(!strcmp("Prefer Clean Boot", name)) {
+					entry->preferCleanBoot = !strcmp("Yes", value);
 				}
 			}
 		}
@@ -1043,9 +1063,11 @@ void config_load_current(ConfigEntry *config) {
 	swissSettings.disableDithering = config->disableDithering;
 	swissSettings.forceAnisotropy = config->forceAnisotropy;
 	swissSettings.forceWidescreen = config->forceWidescreen;
+	swissSettings.forcePollRate = config->forcePollRate;
 	swissSettings.invertCStick = config->invertCStick;
 	swissSettings.triggerLevel = config->triggerLevel;
 	swissSettings.emulateReadSpeed = config->emulateReadSpeed;
+	swissSettings.preferCleanBoot = config->preferCleanBoot;
 }
 
 void config_unload_current() {
@@ -1057,10 +1079,12 @@ void config_unload_current() {
 	swissSettings.disableDithering = backup.disableDithering;
 	swissSettings.forceAnisotropy = backup.forceAnisotropy;
 	swissSettings.forceWidescreen = backup.forceWidescreen;
+	swissSettings.forcePollRate = backup.forcePollRate;
 	swissSettings.invertCStick = backup.invertCStick;
 	swissSettings.triggerLevel = backup.triggerLevel;
 	swissSettings.sram60Hz = backup.sram60Hz;
 	swissSettings.sramProgressive = backup.sramProgressive;
 	swissSettings.emulateReadSpeed = backup.emulateReadSpeed;
+	swissSettings.preferCleanBoot = backup.preferCleanBoot;
 	swissSettings.sramVideo = backup.sramVideo;
 }

@@ -92,6 +92,7 @@ typedef struct {
 	int forceWidescreen;
 	int fontEncode;
 	int audioStreaming;
+	int forcePollRate;
 	int invertCStick;
 	int triggerLevel;
 	int wiirdDebug;	// Enable WiiRD debug
@@ -104,8 +105,10 @@ typedef struct {
 	int disableVideoPatches;
 	int forceVideoActive;
 	int forceDTVStatus;
+	int pauseAVOutput;
 	int emulateReadSpeed;
 	int emulateMemoryCard;
+	int preferCleanBoot;
 	s8 sramHOffset;
 	u8 sramLanguage;
 	u8 sramVideo;

@@ -15,10 +15,12 @@ typedef struct {
 	int disableDithering;
 	int forceAnisotropy;
 	int forceWidescreen;
+	int forcePollRate;
 	int invertCStick;
 	int triggerLevel;
 	int emulateReadSpeed;
-	int cleanBoot;
+	int forceCleanBoot;
+	int preferCleanBoot;
 } ConfigEntry;
 
 void config_find(ConfigEntry *entry);

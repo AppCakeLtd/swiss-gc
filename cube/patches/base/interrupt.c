@@ -1,5 +1,5 @@
 /* 
- * Copyright (c) 2021-2022, Extrems <extrems@extremscorner.org>
+ * Copyright (c) 2021-2023, Extrems <extrems@extremscorner.org>
  * 
  * This file is part of Swiss.
  * 
@@ -113,6 +113,18 @@ OSInterruptMask mask_interrupts(OSInterruptMask mask)
 OSInterruptMask unmask_interrupts(OSInterruptMask mask)
 {
 	return set_interrupt_mask(mask, irq.mask |= mask);
+}
+
+OSInterruptMask mask_user_interrupts(OSInterruptMask mask)
+{
+	OSLocalInterruptMask |= mask;
+	return set_interrupt_mask(mask, ~(OSGlobalInterruptMask | OSLocalInterruptMask));
+}
+
+OSInterruptMask unmask_user_interrupts(OSInterruptMask mask)
+{
+	OSLocalInterruptMask &= ~mask;
+	return set_interrupt_mask(mask, ~(OSGlobalInterruptMask | OSLocalInterruptMask));
 }
 
 uint32_t exi_get_interrupt_mask(unsigned chan)

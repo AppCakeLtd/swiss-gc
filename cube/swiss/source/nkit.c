@@ -1,5 +1,5 @@
 /* 
- * Copyright (c) 2020-2022, Extrems <extrems@extremscorner.org>
+ * Copyright (c) 2020-2023, Extrems <extrems@extremscorner.org>
  * 
  * This file is part of Swiss.
  * 
@@ -799,7 +799,7 @@ static const struct {
 	{ "GGSPA4\x00\x00", false, 2, 0xDA70, 0x09BF72F6, 1234962432,  +225015808, 0x0C0026D796CD60A2, {  531666940,      +36868, 6496, 0xEB41 }, "Metal Gear Solid: The Twin Snakes" },
 	{ "GGSPA4\x01\x00", false, 2, 0x3F71, 0x95986481, 1317832704,  +142145536, 0x0C0026D796CD60A2, {  610263248,      +44848, 6496, 0xEE43 }, "Metal Gear Solid: The Twin Snakes" },
 	{ "GGTE01\x00\x00", false, 1, 0x0790, 0xDB4C3C85,  427722752, +1032255488, 0x00BE1EFF76CB6FEB, {    5230416, +1032256152, 6496, 0xE018 }, "Chibi-Robo! Plug into Adventure!" },
-	{ "GGTJ01\x00\x01", false, 1, 0x915D, 0xD3A3126F,  395712512, +1064265728, 0xDA517FAFEEF00228, {    2482192, +1064267672, 6496, 0x8DBE }, "ChibiRobo!" },
+	{ "GGTJ01\x00\x01", false, 1, 0x915D, 0xD3A3126F,  395712512, +1064265728, 0xDA517FAFEEF00228, {    2482192, +1064267672, 6496, 0x8DBE }, "Chibi-Robo!" },
 	{ "GGTP01\x00\x00", false, 1, 0x5273, 0x88080C8F,  611936256,  +848041984, 0x5398147CF751B1AC, {  177016756,  +848042612, 8096, 0x363D }, "Chibi-Robo!" },
 	{ "GGVD78\x00\x00", false, 1, 0x4365, 0x2E2565BB,  705005568,  +754972672, 0xECB8BFCE925B00A5, {  524112880,     +173072, 6496, 0xE237 }, "Nickelodeon SpongeBob Schwammkopf: Der Film" },
 	{ "GGVE78\x00\x01", false, 1, 0xC940, 0x77BE3CC6,  833777664,  +626200576, 0xE8844FD465C89A0E, {  663582496,     +116960, 6496, 0x2DB3 }, "Nickelodeon SpongeBob SquarePants: The Movie" },
@@ -1286,6 +1286,7 @@ static const struct {
 	{ "GNHE5d\x00\x00", false, 1, 0xCCBB, 0xAAFF05B0,    1169408, +1458808832, 0x0000000000000000, {      94248,       +4056, 6496, 0xF932 }, "Action Replay Ultimate Codes Max Pack" },
 	{ "GNHE5d\x00\x00", false, 1, 0xCCBB, 0xB1B28589,    1714176, +1458264064, 0x0000000000000000, {      94248,       +4056, 6496, 0x3310 }, "Action Replay Ultimate Codes Greatest Hits: Best Buy Achievers Weekend 2004" },
 	{ "GNHE5d\x00\x00", false, 1, 0xCCBB, 0xB21FE659,    1042432, +1458935808, 0x0000000000000000, {      94248,       +4056, 6496, 0x6BCB }, "Cube CD 14 (33)" },
+	{ "GNHE5d\x00\x00", false, 1, 0xCCBB, 0xBF7B7C5A,    1189888, +1458788352, 0x0000000000000000, {      94248,       +4056, 6496, 0xD19A }, "Power Link Game Enhancer Disc" },
 	{ "GNHE5d\x00\x00", false, 1, 0xCCBB, 0xC4256D56,    1650688, +1458327552, 0x0000000000000000, {      94248,       +4056, 6496, 0x83D8 }, "Ultimate Codes for Use with Metroid Prime" },
 	{ "GNHE5d\x00\x00", false, 1, 0xCCBB, 0xC7E200F3,    2117632, +1457860608, 0x0000000000000000, {      94248,       +4056, 6496, 0x3A76 }, "Action Replay Ultimate Cheats für Enter the Matrix" },
 	{ "GNHE5d\x00\x00", false, 1, 0xCCBB, 0xCC3182C3,   11837440, +1448140800, 0x0000000000000000, {      94248,       +4056, 6496, 0xCC3B }, "MaxPlay" },
@@ -2017,7 +2018,7 @@ static const struct {
 	{ "UGPJ01\x00\x03", false, 1, 0xC4F0, 0xDFF567CB,    2473984, +1457504256, 0xFB2218FBFA6AB9FE, {    2003524,      +28092, 6496, 0xE53B }, "Game Boy Player Start-Up Disc" },
 	{ "UGPP01\x00\x01", false, 1, 0x6D4F, 0x5ECD9681,    5079040, +1454899200, 0x4E9244DEFB94F10C, {    2317764,       +8764, 8096, 0x8972 }, "Game Boy Player Start-Up Disc" },
 	{ "UGPP01\x00\x02", false, 1, 0xCA50, 0x1E26380C,    5079040, +1454899200, 0x483B4CE794041533, {    2317764,       +8764, 8096, 0x8972 }, "Game Boy Player Start-Up Disc" },
-#define REDUMP_COUNT 1966
+#define REDUMP_COUNT 1967
 	{ "00\0E01\x00\x00",false, 1, 0x21CF, 0xBF114CB3,   31170560, +1428807680, 0xC1BAC83BFBED3EDB, {    7795364,      +23900, 6496, 0xBBEA }, "Nintendo Developer Demo" },
 	{ "00\0E01\x00\x00",false, 1, 0x42A2, 0x499CF1AB,   31170560, +1428807680, 0xC1BAC83BFBED3EDB, {    7795364,      +23900, 6496, 0xBBEA }, "Nintendo Developer Demo" },
 	{ "D28J01\x00\x00", true,  1, 0x8FC6, 0x8EFBB42B,  794134528,  +665843712, 0xB1F399DE51C25382, {  394649296,  +665814992, 6496, 0xE5B2 }, "Gekkan Nintendo Tentou Demo 2002.4.4" },
@@ -2036,6 +2037,7 @@ static const struct {
 	{ "GAGPEL\x00\x00", false, 1, 0xA2BD, 0x488AB477,  754982912,  +704995328, 0xE1DF569A51FB9D2C, {  754973244,  +704996900, 8096, 0x63D7 }, "Astérix & Obélix XXL" },
 	{ "GASE8P\x00\x00", false, 1, 0xA1B0, 0xDD918AD1, 1404723200,   +55255040, 0xD9B670DD43BD37A5, {  774689240,   +55255472, 6496, 0x0D21 }, "Sonic Adventure DX: Director's Cut" },
 	{ "GB8E78\x00\x00", true,  1, 0x3B42, 0x1F19869C,  432257024, +1027721216, 0x0716D4D5A73AB0BC, {  412625660,      +32768, 6496, 0x9BD7 }, "BattleBots" },
+	{ "GCCE01\x00\x00", false, 1, 0xF223, 0xD466236E, 1329932288,  +130045952, 0x89D01E6E0E49A121, {  570366340,      +30392, 6496, 0x6BE6 }, "Final Fantasy Crystal Chronicles: Single Player Upgrade" },
 	{ "GDEE71\x00\x00", false, 1, 0xC228, 0xC2C80167, 1358307328,  +101670912, 0x616D2EAD3B11D74F, {  914092380,       +7536, 6496, 0x2D5A }, "Baldur's Gate: Dark Alliance" },
 	{ "GEAE8P\x00\x00", false, 1, 0x4329, 0x22E6FE4B, 1421514752,   +38463488, 0x776C0A056378855A, { 1206244016,   +36660560, 6496, 0x51AD }, "Skies of Arcadia Legends Maeson" },
 	{ "GEAE8P\x00\x00", false, 1, 0xE528, 0xEE8698CB, 1441400832,   +18577408, 0xEE3D9D60D95DC4D8, { 1206239432,   +16754488, 6496, 0xCB3E }, "Skies of Arcadia Legends" },
@@ -2085,6 +2087,7 @@ static const struct {
 	{ "GXXE01\x00\x00", false, 1, 0x98C1, 0xDF5B1825, 1087750144,  +372228096, 0x6816956D0220746F, {   12617832,  +366595768, 6496, 0xBAC8 }, "Pokémon XG: NeXt Gen" },
 	{ "GXXE01\x00\x00", false, 1, 0x98C1, 0xE0D19118, 1093384192,  +366594048, 0xA851883E7EBE15B2, {   12617832,  +366595768, 6496, 0xBAC8 }, "Pokémon XG: NeXt Gen" },
 	{ "GXXE01\x00\x00", false, 1, 0xA1B6, 0x734E4775, 1093365760,  +366612480, 0x136F486D1EA10408, {   12619752,  +363950104, 6496, 0xF5D7 }, "Pokémon XD: Gale of Darkness: ReduX" },
+	{ "GZLE01\x00\x00", false, 1, 0x863D, 0x5D06C4D8,  720627712,   +40671232, 0x36D193DF45BFDAA4, {  225455448,    +9556648, 6496, 0xDF7E }, "The Legend of Zelda: The Wind Waker Rewritten" },
 	{ "GZPE70\x00\x00", false, 1, 0x887C, 0xBC256FCD, 1416488960,   +43489280, 0xE7D53A48267CDB88, {    2317240,      +17384, 6496, 0x195D }, "Zapper" },
 	{ "RELSAB\x00\x00", false, 1, 0x2E3D, 0x97BA74C5,  128698368, +1331279872, 0x0EF0BD0AF110A2B7, {  113594680, +1331280376, 8096, 0xADB1 }, "Metroid Prime 3: Corruption" },
 	{ "RELSAB\x00\x00", false, 1, 0x35B7, 0x524B2418,  750051328,  +709926912, 0x589D3DE183C7219D, {         ~0,          +0,    0, 0xFFFF }, "Disney/Pixar Ratatouille" },

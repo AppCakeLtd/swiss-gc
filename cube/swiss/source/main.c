@@ -67,7 +67,7 @@ void Initialise (void)
 	else if(!strncmp(&IPLInfo[0x55], "MPAL", 4))
 		swissSettings.sramVideo = SYS_VIDEO_MPAL;
 
-	GXRModeObj *vmode = getVideoModeFromSwissSetting(swissSettings.uiVMode);
+	GXRModeObj *vmode = getVideoMode();
 	setVideoMode(vmode);
 
 	init_font();
@@ -229,6 +229,7 @@ int main(int argc, char *argv[])
 		uiDrawObj_t *msgBox = DrawPublish(DrawProgressBar(true, 0, "Initialising Network"));
 		init_network();
 		init_httpd_thread();
+		init_wiiload_thread();
 		DrawDispose(msgBox);
 	}
 	
@@ -245,7 +246,7 @@ int main(int argc, char *argv[])
 			if(strverscmp(swissSettings.gcloaderTopVersion, gcloaderVersionStr) < 0) {
 				strlcpy(swissSettings.gcloaderTopVersion, gcloaderVersionStr, sizeof(swissSettings.gcloaderTopVersion));
 			}
-			if(strverscmp(swissSettings.gcloaderTopVersion, "2.0.0") < 0 || !strcmp("2.0.0.BETA", gcloaderVersionStr)) {
+			if(strverscmp(swissSettings.gcloaderTopVersion, "2.0.0") < 0) {
 				uiDrawObj_t *msgBox = DrawPublish(DrawMessageBox(D_INFO, "A firmware update is available.\ngc-loader.com/firmware-updates"));
 				wait_press_A();
 				DrawDispose(msgBox);

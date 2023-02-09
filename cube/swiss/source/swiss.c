@@ -4,6 +4,7 @@
 *
 */
 
+#include <argz.h>
 #include <stdio.h>
 #include <stdarg.h>
 #include <gccore.h>		/*** Wrapper to include common libogc headers ***/
@@ -123,63 +124,49 @@ void ogc_video__reset()
 	while(!__SYS_SyncSram());
 	
 	/* set TV mode for current game */
-	uiDrawObj_t *msgBox = NULL;
 	switch(swissSettings.gameVMode) {
 		case -2:
-			msgBox = DrawMessageBox(D_INFO, "Video Mode: PAL 576p");
+			sprintf(txtbuffer, "Video Mode: %s", "PAL 576p");
 			newmode = &TVPal576ProgScale;
 			break;
 		case -1:
-			msgBox = DrawMessageBox(D_INFO, "Video Mode: NTSC 480p");
+			sprintf(txtbuffer, "Video Mode: %s", "NTSC 480p");
 			newmode = &TVNtsc480Prog;
 			break;
 		case 0:
 			if(swissSettings.sramVideo == SYS_VIDEO_MPAL && !getDTVStatus()) {
-				msgBox = DrawMessageBox(D_INFO, "Video Mode: PAL-M 480i");
+				sprintf(txtbuffer, "Video Mode: %s", "PAL-M 480i");
 				newmode = &TVMpal480IntDf;
 			}
 			else if(swissSettings.sramVideo == SYS_VIDEO_PAL) {
-				if(swissSettings.sramProgressive && !getDTVStatus())
-					msgBox = DrawMessageBox(D_WARN, "Video Mode: PAL 576i\nComponent Cable not detected.");
-				else
-					msgBox = DrawMessageBox(D_INFO, "Video Mode: PAL 576i");
-				
+				sprintf(txtbuffer, "Video Mode: %s", "PAL 576i");
 				newmode = &TVPal576IntDfScale;
 			}
 			else {
-				if(swissSettings.sramProgressive && !getDTVStatus())
-					msgBox = DrawMessageBox(D_WARN, "Video Mode: NTSC 480i\nComponent Cable not detected.");
-				else
-					msgBox = DrawMessageBox(D_INFO, "Video Mode: NTSC 480i");
-				
+				sprintf(txtbuffer, "Video Mode: %s", "NTSC 480i");
 				newmode = &TVNtsc480IntDf;
 			}
 			break;
 		case 1 ... 3:
 			sprintf(txtbuffer, "Video Mode: %s %s", "NTSC", gameVModeStr[swissSettings.gameVMode]);
-			msgBox = DrawMessageBox(D_INFO, txtbuffer);
 			newmode = &TVNtsc480IntDf;
 			break;
 		case 4 ... 7:
 			sprintf(txtbuffer, "Video Mode: %s %s", "NTSC", gameVModeStr[swissSettings.gameVMode]);
-			msgBox = DrawMessageBox(D_INFO, txtbuffer);
 			newmode = &TVNtsc480Prog;
 			break;
 		case 8 ... 10:
 			sprintf(txtbuffer, "Video Mode: %s %s\n%s Mode selected.", "PAL", gameVModeStr[swissSettings.gameVMode], swissSettings.sram60Hz ? "60Hz":"50Hz");
-			msgBox = DrawMessageBox(D_INFO, txtbuffer);
 			newmode = &TVPal576IntDfScale;
 			break;
 		case 11 ... 14:
 			sprintf(txtbuffer, "Video Mode: %s %s\n%s Mode selected.", "PAL", gameVModeStr[swissSettings.gameVMode], swissSettings.sram60Hz ? "60Hz":"50Hz");
-			msgBox = DrawMessageBox(D_INFO, txtbuffer);
 			newmode = &TVPal576ProgScale;
 			break;
 	}
 	if((newmode != NULL) && (newmode != getVideoMode())) {
 		DrawVideoMode(newmode);
-	}
-	if(msgBox != NULL) {
+		uiDrawObj_t *msgBox = DrawMessageBox(D_INFO, txtbuffer);
 		DrawPublish(msgBox);
 		sleep(2);
 		DrawDispose(msgBox);
@@ -1031,10 +1018,10 @@ void load_app(ExecutableFile *fileToPatch)
 		BINtoARAM(buffer, sizeToRead, 0x81300000);
 	}
 	else if(type == PATCH_DOL) {
-		DOLtoARAM(buffer, 0, NULL);
+		DOLtoARAM(buffer, NULL, 0);
 	}
 	else if(type == PATCH_ELF) {
-		ELFtoARAM(buffer, 0, NULL);
+		ELFtoARAM(buffer, NULL, 0);
 	}
 }
 
@@ -1083,26 +1070,20 @@ void boot_dol()
 	}
 	
 	// Build a command line to pass to the DOL
-	int argc = 0;
-	char *argv[1024];
+	char *argz = getExternalPath(&curFile.name[0]);
+	size_t argz_len = strlen(argz) + 1;
 
-	u32 readTest;
 	char fileName[PATHNAME_MAX];
 	memset(&fileName[0], 0, PATHNAME_MAX);
 	strncpy(&fileName[0], &curFile.name[0], strrchr(&curFile.name[0], '.') - &curFile.name[0]);
 	print_gecko("DOL file name without extension [%s]\r\n", fileName);
 	
-	file_handle *cliArgFile = calloc(1, sizeof(file_handle));
-	
 	// .cli argument file
+	file_handle *cliArgFile = calloc(1, sizeof(file_handle));
 	snprintf(cliArgFile->name, PATHNAME_MAX, "%s.cli", fileName);
-	if(devices[DEVICE_CUR]->readFile(cliArgFile, &readTest, 4) != 4) {
-		free(cliArgFile);
-		cliArgFile = NULL;
-	}
 	
 	// we found something, use parameters (.cli)
-	if(cliArgFile) {
+	if(devices[DEVICE_CUR]->readFile(cliArgFile, NULL, 0) == 0 && cliArgFile->size) {
 		print_gecko("Argument file found [%s]\r\n", cliArgFile->name);
 		char *cli_buffer = calloc(1, cliArgFile->size + 1);
 		if(cli_buffer) {
@@ -1110,43 +1091,19 @@ void boot_dol()
 			devices[DEVICE_CUR]->readFile(cliArgFile, cli_buffer, cliArgFile->size);
 
 			// Parse CLI
-			argv[argc] = getExternalPath(&curFile.name[0]);
-			argc++;
-			// First argument is at the beginning of the file
-			if(cli_buffer[0] != '\r' && cli_buffer[0] != '\n') {
-				argv[argc] = cli_buffer;
-				argc++;
-			}
-
-			// Search for the others after each newline
-			for(i = 0; i < cliArgFile->size; i++) {
-				if(cli_buffer[i] == '\r' || cli_buffer[i] == '\n') {
-					cli_buffer[i] = '\0';
-				}
-				else if(cli_buffer[i - 1] == '\0') {
-					argv[argc] = cli_buffer + i;
-					argc++;
-
-					if(argc >= 1024)
-						break;
-				}
-			}
+			argz_add_sep(&argz, &argz_len, cli_buffer, '\n');
+			free(cli_buffer);
 		}
 	}
-
+	devices[DEVICE_CUR]->closeFile(cliArgFile);
 	free(cliArgFile);
 
-	file_handle *dcpArgFile = calloc(1, sizeof(file_handle));
-	
 	// .dcp parameter file
+	file_handle *dcpArgFile = calloc(1, sizeof(file_handle));
 	snprintf(dcpArgFile->name, PATHNAME_MAX, "%s.dcp", fileName);
-	if(devices[DEVICE_CUR]->readFile(dcpArgFile, &readTest, 4) != 4) {
-		free(dcpArgFile);
-		dcpArgFile = NULL;
-	}
 	
 	// we found something, parse and display parameters for selection (.dcp)
-	if(dcpArgFile) {
+	if(devices[DEVICE_CUR]->readFile(dcpArgFile, NULL, 0) == 0 && dcpArgFile->size) {
 		print_gecko("Argument file found [%s]\r\n", dcpArgFile->name);
 		char *dcp_buffer = calloc(1, dcpArgFile->size + 1);
 		if(dcp_buffer) {
@@ -1155,24 +1112,26 @@ void boot_dol()
 
 			// Parse DCP
 			parseParameters(dcp_buffer);
+			free(dcp_buffer);
+
 			Parameters *params = (Parameters*)getParameters();
 			if(params->num_params > 0) {
 				DrawArgsSelector(getRelativeName(&curFile.name[0]));
 				// Get an argv back or none.
-				populateArgv(&argc, argv, (char*)&curFile.name);
+				populateArgv(&argz, &argz_len, &curFile.name[0]);
 			}
 		}
 	}
-
+	devices[DEVICE_CUR]->closeFile(dcpArgFile);
 	free(dcpArgFile);
 
 	if(devices[DEVICE_CUR] != NULL) devices[DEVICE_CUR]->deinit( devices[DEVICE_CUR]->initial );
 	// Boot
 	if(!memcmp(dol_buffer, ELFMAG, SELFMAG)) {
-		ELFtoARAM(dol_buffer, argc, argc == 0 ? NULL : argv);
+		ELFtoARAM(dol_buffer, argz, argz_len);
 	}
 	else {
-		DOLtoARAM(dol_buffer, argc, argc == 0 ? NULL : argv);
+		DOLtoARAM(dol_buffer, argz, argz_len);
 	}
 
 	free(dol_buffer);
@@ -1185,7 +1144,7 @@ bool manage_file() {
 	bool canMove = canWrite && isFile;
 	bool canCopy = isFile;
 	bool canDelete = canWrite;
-	bool canRename = canWrite;
+	bool canRename = canWrite && devices[DEVICE_CUR]->renameFile;
 	
 	// Ask the user what they want to do with the selected entry
 	uiDrawObj_t* manageFileBox = DrawEmptyBox(10,150, getVideoMode()->fbWidth-10, 320);
@@ -1466,8 +1425,11 @@ bool manage_file() {
 					if(!memcmp(&gci, "DATELGC_SAVE", 12)) {
 						devices[DEVICE_CUR]->seekFile(&curFile, 0x80, DEVICE_HANDLER_SEEK_SET);
 						devices[DEVICE_CUR]->readFile(&curFile, &gci, sizeof(GCI));
+						#pragma GCC diagnostic push
+						#pragma GCC diagnostic ignored "-Wrestrict"
 						swab(&gci.reserved01, &gci.reserved01, 2);
 						swab(&gci.icon_addr,  &gci.icon_addr, 20);
+						#pragma GCC diagnostic pop
 					}
 					else if(!memcmp(&gci, "GCSAVE", 6)) {
 						devices[DEVICE_CUR]->seekFile(&curFile, 0x110, DEVICE_HANDLER_SEEK_SET);
@@ -1480,7 +1442,8 @@ bool manage_file() {
 			
 			// Read from one file and write to the new directory
 			u32 isCard = devices[DEVICE_CUR] == &__device_card_a || devices[DEVICE_CUR] == &__device_card_b;
-			u32 curOffset = curFile.offset, cancelled = 0, chunkSize = (isCard||isDestCard) ? curFile.size : (256*1024);
+			u32 bulkWrite = isCard || devices[DEVICE_DEST] == &__device_qoob;
+			u32 curOffset = curFile.offset, cancelled = 0, chunkSize = (bulkWrite||isDestCard) ? curFile.size : (256*1024);
 			char *readBuffer = (char*)memalign(32,chunkSize);
 			sprintf(txtbuffer, "Copying to: %s",getRelativeName(destFile->name));
 			uiDrawObj_t* progBar = DrawProgressBar(false, 0, txtbuffer);
@@ -1726,7 +1689,7 @@ void load_game() {
 	ConfigEntry *config = calloc(1, sizeof(ConfigEntry));
 	memcpy(config->game_id, &GCMDisk.ConsoleID, 4);
 	memcpy(config->game_name, GCMDisk.GameName, 64);
-	config->cleanBoot = !valid_gcm_boot(&GCMDisk);
+	config->forceCleanBoot = !valid_gcm_boot(&GCMDisk);
 	config_find(config);
 	
 	// Show game info or return to the menu
@@ -1748,7 +1711,7 @@ void load_game() {
 	config_load_current(config);
 	gameID_early_set(&GCMDisk);
 	
-	if(config->cleanBoot) {
+	if(config->forceCleanBoot || (config->preferCleanBoot && devices[DEVICE_CUR]->location == LOC_DVD_CONNECTOR)) {
 		gameID_set(&GCMDisk, get_gcm_boot_hash(&GCMDisk));
 		
 		if(devices[DEVICE_CUR]->location != LOC_DVD_CONNECTOR) {
@@ -1830,7 +1793,7 @@ void load_game() {
 	
 	*(vu8*)VAR_CURRENT_DISC = fileToPatch && fileToPatch->file == disc2File;
 	*(vu8*)VAR_SECOND_DISC = !!disc2File;
-	*(vu8*)VAR_DRIVE_PATCHED = 0;
+	*(vu8*)VAR_DRIVE_PATCHED = drive_status == DEBUG_MODE;
 	*(vu8*)VAR_EMU_READ_SPEED = swissSettings.emulateReadSpeed;
 	*(vu32**)VAR_EXI_REGS = NULL;
 	*(vu8*)VAR_EXI_SLOT = EXI_CHANNEL_MAX;
@@ -2137,7 +2100,7 @@ int info_game(ConfigEntry *config)
 		u32 buttons = PAD_ButtonsHeld(0);
 		if(buttons & PAD_BUTTON_A) {
 			if(buttons & PAD_TRIGGER_L) {
-				config->cleanBoot = 1;
+				config->forceCleanBoot = 1;
 			}
 			ret = 1;
 			break;
